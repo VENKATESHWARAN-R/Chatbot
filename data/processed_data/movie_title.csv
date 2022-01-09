@@ -1,4 +1,4 @@
-,movie_id,name,year,rating,genre
+idx,movie_id,name,year,rating,genre
 0,m0,10 things i hate about you,1999,6.90,"['comedy', 'romance']"
 1,m1,1492: conquest of paradise,1992,6.20,"['adventure', 'biography', 'drama', 'history']"
 2,m2,15 minutes,2001,6.10,"['action', 'crime', 'drama', 'thriller']"
