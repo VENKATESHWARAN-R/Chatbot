@@ -116,7 +116,7 @@ def get_genre_dict(movie_title_df: pd.DataFrame):
     return genre_dict
 
 # %%
-def prepare_conversations(movie_lines_df: pd.DataFrame, movie_conversation_df: pd.DataFrame):
+def prepare_conversations(movie_lines_df: pd.DataFrame, movie_conversation_df: pd.DataFrame, only_start: bool = False):
     """
     This line takes the input as movie lines pandas dataframe and prepares the genre dict
     input: movie_lines_df -> pandas.DataFrame, movie_conversation_df -> pandas.DataFrame
@@ -140,6 +140,8 @@ def prepare_conversations(movie_lines_df: pd.DataFrame, movie_conversation_df: p
             conversation_data_dict['movie_id'].append(movie_id)
             conversation_data_dict['input'].append(dialogue_dict[convo_list[convos]])
             conversation_data_dict['target'].append(dialogue_dict[convo_list[convos+1]])
+            if only_start:
+              break
 
     # Prepare dataframe from the dictionary for better access
     conversation_data_df = pd.DataFrame.from_dict(conversation_data_dict)
@@ -162,6 +164,21 @@ def clean_text(input_text: str, add_tags: bool = False, start_tag: str = 'START_
         if the add_tags value is True (it's False by default) it will add the start tag and end tags at the start and end of the text
         we can also define the start_tag and end_tag values
     """
+    def replace_common_words(text: str):
+        text = text.lower()
+        text = re.sub("i'm", "i am", text)
+        text = re.sub("he's", "he is", text)
+        text = re.sub("she's", "she is", text)
+        text = re.sub("that's", "that is", text)
+        text = re.sub("what's", "what is", text)
+        text = re.sub("where's", "where is", text)
+        text = re.sub("'ll", " will", text)
+        text = re.sub("'ve", " have", text)
+        text = re.sub("'re", " are", text)
+        text = re.sub("'d", " would", text)
+        text = re.sub("n't", " not", text)
+        return text
+
     def remove_punctuation(text: str):
         punctuation_list = set(string.punctuation)
         return ''.join(ch for ch in text if ch not in punctuation_list)
@@ -192,6 +209,7 @@ def clean_text(input_text: str, add_tags: bool = False, start_tag: str = 'START_
         return start_tag + text + end_tag
 
     input_text = input_text.lower()
+    input_text = replace_common_words(input_text)
     input_text = replace_words(input_text, replace_word_from, replace_word_to) if replace_word_from and (len(replace_word_from) == len(replace_word_to)) else input_text
     input_text = remove_ignore_words(input_text, ignore_words) if ignore_words else input_text
     input_text = remove_digits(input_text) if remove_numbers else input_text
@@ -262,7 +280,7 @@ def split_vectorize_filter_unk(conversation_data_df: pd.DataFrame, Vectorizer: T
         target_list = list(target_tensor.numpy())
         unknown_count_q = input_list.count(unk_index)
         unknown_count_a = target_list.count(unk_index)
-        if unknown_count_a <=2 :
+        if unknown_count_a <=1 :
             if unknown_count_q > 0:
                 temp_list = list(filter(lambda num: num != 0, input_list)) # This list will have the inputs without zeros padded
                 if unknown_count_q/len(temp_list) > 0.2:
