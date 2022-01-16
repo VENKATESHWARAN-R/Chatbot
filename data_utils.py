@@ -4,9 +4,10 @@ import pandas as pd
 import numpy as np
 import re
 import string
-import nltk
+import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.layers.experimental.preprocessing import TextVectorization
+from tensorflow.keras import Model
 
 # %%
 def load_data(file_name: str, data_location: str = './data/'):
@@ -301,6 +302,38 @@ def split_vectorize_filter_unk(conversation_data_df: pd.DataFrame, Vectorizer: T
     print(f'After unknown token filters training data points: {filt_data_len}')
 
     return training_data, testing_data
+
+# %%
+def make_prediction(vocab_list, decoder_model_function, encoder_model: Model, input_text: str = 'hi', next_word: str = 'START_', clean_text = clean_text, max_length: int = 19, multi_layer: bool = True):
+    """
+    This function takes inputs as follows and returns the model response.
+    input: vocab_list -> this is the list of voicabulary used in the model,
+            model_function -> this is a reference functions in wich the decoder model is defined, 
+            encoder_model -> this is the encoder model which need to be used for input text encoding, 
+            input_text -> this is the input phrase for which the model create the response the default value if 'hi', 
+            next_word -> this is the trigger or start word for the decoder model, the default value is 'START_',
+            clean_text -> this is a referance of the function which need to be used for cleaning the text the default is 'clean_text' function written or imported in this python file,
+            max_length -> max length of the bot response defaults to 19
+            multi_layer -> if the model single layer then this has to be False by default it is True
+    output: bot_response -> this is the predicted response of the bot
+    """
+    states_list = []
+    input_text = clean_text(input_text)
+    if multi_layer:
+        encoder_output = encoder_model.predict([input_text])
+    else:
+        encoder_output = [encoder_model.predict([input_text])]
+    for states in encoder_output:
+        states_list.append([tf.constant(states[0]), tf.constant(states[1])])
+    stop_condition = True
+    bot_response = ""
+    states = states_list
+    while stop_condition:
+        next_word, states = decoder_model_function(next_word, states, vocab_list)
+        if next_word == '_END' or len(bot_response.split()) > max_length:
+            break
+        bot_response += next_word + ' '
+    return bot_response
 
 # %%
 
