@@ -304,7 +304,7 @@ def split_vectorize_filter_unk(conversation_data_df: pd.DataFrame, Vectorizer: T
     return training_data, testing_data
 
 # %%
-def make_prediction(vocab_list, decoder_model_function, encoder_model: Model, input_text: str = 'hi', next_word: str = 'START_', clean_text = clean_text, max_length: int = 19, multi_layer: bool = True):
+def make_prediction_old(vocab_list, decoder_model_function, encoder_model: Model, input_text: str = 'hi', next_word: str = 'START_', clean_text = clean_text, max_length: int = 19, multi_layer: bool = True):
     """
     This function takes inputs as follows and returns the model response.
     input: vocab_list -> this is the list of voicabulary used in the model,
@@ -329,7 +329,73 @@ def make_prediction(vocab_list, decoder_model_function, encoder_model: Model, in
     bot_response = ""
     states = states_list
     while stop_condition:
-        next_word, states = decoder_model_function(next_word, states, vocab_list)
+        _, next_word, states = decoder_model_function(next_word, states, vocab_list)
+        if next_word == '_END' or len(bot_response.split()) > max_length:
+            break
+        bot_response += next_word + ' '
+    return bot_response
+
+# %%
+def make_prediction(vocab_list, decoder_model_function, encoder_model: Model, input_text: str = 'hi', 
+                    next_word: str = 'START_', clean_text = clean_text, max_length: int = 19, 
+                    multi_layer: bool = True, go_beam: bool = False, top_values: int = 3, top_percentage: float = 50.0):
+    """
+    This function takes inputs as follows and returns the model response.
+    input: vocab_list -> this is the list of voicabulary used in the model,
+            model_function -> this is a reference functions in wich the decoder model is defined, 
+            encoder_model -> this is the encoder model which need to be used for input text encoding, 
+            input_text -> this is the input phrase for which the model create the response the default value if 'hi', 
+            next_word -> this is the trigger or start word for the decoder model, the default value is 'START_',
+            clean_text -> this is a referance of the function which need to be used for cleaning the text the default is 'clean_text' function written or imported in this python file,
+            max_length -> max length of the bot response defaults to 19
+            multi_layer -> if the model single layer then this has to be False. by default it is True
+            go_beam -> if more variety output is needed we can set this to true. by default it is False
+            top_values -> number of top values to consider from the output. defaults to 3 this works only if go_beam = True
+            top_percentage -> prbability of the different words to consider. defaults to 50. this also works only if go_beam = True
+    output: bot_response -> this is the predicted response of the bot
+    """
+    def get_random_word(decoder_output: np.ndarray, vocab_list: list = vocab_list, top_values:int = top_values, top_percentage: float = top_percentage):
+      """
+      Instead of getting the same word as output for given input this function will help to give the output with different combination of words.
+      This will get the probability distribution of the model as input.
+      from the probability distribution of outputs insetad of choosing the word with maximum probability this function will choose top words 
+      with maximum probabilities and randomly chooses one word from that. for considering the top values this function uses the variable/value top_values=3 by default.
+      from the top words this will consider only the words with the given percentage top_percentage from the maximum percentage.
+      for example if the top 3 percentages and their words are [(80, hi), (50, hello), (20, welcome)] and if top_percentage = 50
+      the max_prob = 80
+      prob_percentage_value = (80/100) * 50 => 40
+      this will consider the words with probability more than 40 so the choise of words would be [(80, hi), (50, hello)]
+      from this list of words the function will pick a random word everytime
+      """
+      word_prob_match = zip(decoder_output, vocab_list)
+      top_prob_list = sorted(word_prob_match, reverse=True)[:top_values]
+      max_prob = top_prob_list[0][0]
+      prob_percentage_val = (max_prob/100) * top_percentage
+      beam_word_list, beam_prob_list = [], []
+      for word_prob in top_prob_list:
+        word_probability = word_prob[0]
+        if word_probability > prob_percentage_val:
+          beam_prob_list.append(word_prob[0])
+          beam_word_list.append(word_prob[1])
+      next_word_idx = np.random.randint(low=0, high=len(beam_prob_list))
+      next_word = beam_word_list[next_word_idx]
+      return next_word
+
+    states_list = []
+    input_text = clean_text(input_text)
+    if multi_layer:
+        encoder_output = encoder_model.predict([input_text])
+    else:
+        encoder_output = [encoder_model.predict([input_text])]
+    for states in encoder_output:
+        states_list.append([tf.constant(states[0]), tf.constant(states[1])])
+    stop_condition = True
+    bot_response = ""
+    states = states_list
+    while stop_condition:
+        decoder_output, next_word, states = decoder_model_function(next_word, states, vocab_list)
+        if go_beam:
+          next_word = get_random_word(decoder_output=decoder_output, vocab_list=vocab_list, top_percentage=top_percentage)
         if next_word == '_END' or len(bot_response.split()) > max_length:
             break
         bot_response += next_word + ' '
