@@ -68,7 +68,7 @@ Human:  END CONVO
 KATTA: threatening me 
 ```
 
-### Highlight
+### Update
 
 > KATTA🐶 is now updated with custom beam decoder function with probability percentage of 50. which mean now he can talk like human (Instead of giving the same response for the same question now he can give different combination of responses) we can get more different responses by tuning the parameters top_percentage: float = 50.0 and top_values: int = 3 modifying these values would go to two extremes as one would be the robot like same answers and another would be different answers but unrelatable. ideal values would be top_percentage: float = 75.0 and top_values: int = 3
 
